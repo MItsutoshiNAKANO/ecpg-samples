@@ -1,0 +1,167 @@
+/// @file
+/// @brief The stored procedure samples.
+
+#include <err.h>
+#include <sysexits.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <stdio.h>
+
+/// @brief The format of prepared statement names.
+#define PREPARED_NAMES_FORMAT "stmt%d"
+
+/// @brief Print the warning message.
+/// @param file The file name.
+/// @param line The line number.
+/// @param func The function name.
+/// @param fmt The format string.
+/// @param ap The arguments.
+static void
+vsql_warn(
+    const char *file, long line, const char *func, const char *fmt,
+    va_list ap)
+{
+    vwarnx(fmt, ap);
+    warnx("in %s:%ld:%s()", file, line, func);
+
+    warnx("==== sqlca ====");
+    warnx("sqlcode: %ld", sqlca.sqlcode);
+    warnx("sqlerrm.sqlerrml: %d", sqlca.sqlerrm.sqlerrml);
+    warnx("sqlerrm.sqlerrmc: %s", sqlca.sqlerrm.sqlerrmc);
+    warnx("sqlerrd: %ld %ld %ld %ld %ld %ld",
+        sqlca.sqlerrd[0], sqlca.sqlerrd[1], sqlca.sqlerrd[2],
+        sqlca.sqlerrd[3], sqlca.sqlerrd[4], sqlca.sqlerrd[5]);
+    warnx("sqlwarn: %d %d %d %d %d %d %d %d",
+        sqlca.sqlwarn[0], sqlca.sqlwarn[1], sqlca.sqlwarn[2], sqlca.sqlwarn[3],
+        sqlca.sqlwarn[4], sqlca.sqlwarn[5], sqlca.sqlwarn[6], sqlca.sqlwarn[7]);
+    warnx("sqlstate: %5s", sqlca.sqlstate);
+    warnx("===============");
+}
+
+/// @brief Print the warning message.
+/// @param file The file name.
+/// @param line The line number.
+/// @param func The function name.
+/// @param fmt The format string.
+/// @param ... The arguments.
+static void
+sql_warn(const char *file, long line, const char *func, const char *fmt, ...)
+{
+    va_list ap;
+    va_start(ap, fmt);
+    vsql_warn(file, line, func, fmt, ap);
+    va_end(ap);
+}
+
+/// @brief Print the error message and exit.
+/// @param file The file name.
+/// @param line The line number.
+/// @param func The function name.
+/// @param exit_status The exit status.
+/// @param fmt The format string.
+/// @param ... The arguments.
+[[noreturn]] static void
+sql_error(
+    const char *file, long line, const char *func, int exit_status,
+    const char *fmt, ...)
+{
+    va_list ap;
+    va_start(ap, fmt);
+    vsql_warn(file, line, func, fmt, ap);
+    verrx(exit_status, fmt, ap);
+    va_end(ap);
+
+}
+
+/// @brief Connect to the database.
+static void
+connect_db(void)
+{
+    EXEC SQL WHENEVER SQLERROR CALL sql_error(
+        __FILE__, __LINE__, __func__, EX_IOERR, "connect error");
+    EXEC SQL WHENEVER SQLWARNING CALL sql_warn(
+        __FILE__, __LINE__, __func__, "connect warning");
+    EXEC SQL CONNECT TO "tcp:postgresql://127.0.0.1" USER "sample" USING "sample";
+}
+
+/// @brief Prepare the statements.
+static void
+prepare(void)
+{
+    EXEC SQL WHENEVER SQLERROR CALL sql_error(
+        __FILE__, __LINE__, __func__, EX_UNAVAILABLE, "prepare error");
+    EXEC SQL WHENEVER SQLWARNING CALL sql_warn(
+        __FILE__, __LINE__, __func__, "prepare warning");
+    for (int i = 0; i < 31; ++i) {
+        EXEC SQL BEGIN DECLARE SECTION;
+        char stmt[128];
+        char query[256];
+        EXEC SQL END DECLARE SECTION;
+
+        snprintf(stmt, sizeof stmt, PREPARED_NAMES_FORMAT, i + 1);
+        snprintf(
+            query, sizeof query,
+            "SELECT value%d AS value FROM months WHERE month_label = ?", i + 1);
+        EXEC SQL PREPARE :stmt FROM :query;
+    }
+}
+
+/// @brief Execute the statements.
+/// @param month The month.
+/// @return The total value.
+long long
+execute(const char *month)
+{
+    EXEC SQL WHENEVER SQLERROR CALL sql_error(
+        __FILE__, __LINE__, __func__, EX_UNAVAILABLE, "execute error");
+    EXEC SQL WHENEVER SQLWARNING CALL sql_warn(
+        __FILE__, __LINE__, __func__, "execute warning");
+
+    EXEC SQL BEGIN DECLARE SECTION;
+    const char *m = month;
+    EXEC SQL END DECLARE SECTION;
+
+    long long total = 0;
+    for (int i = 0; i < 31; ++i) {
+        EXEC SQL BEGIN DECLARE SECTION;
+        char stmt[128];
+        long long val;
+        int val_ind;
+        EXEC SQL END DECLARE SECTION;
+
+        snprintf(stmt, sizeof stmt, PREPARED_NAMES_FORMAT, i + 1);
+        EXEC SQL EXECUTE :stmt INTO :val :val_ind USING :m;
+        if (val_ind < 0) {
+            continue;
+        }
+        total += val;
+    }
+    return total;
+}
+
+/// @brief Print the usage.
+/// @param exit_code The exit code.
+/// @param program The program name.
+[[noreturn]] static void
+usage(int exit_code, const char *program)
+{
+    fprintf(exit_code ? stderr : stdout, "Usage: %s YYYY-MM-01\n", program);
+    exit(exit_code);
+}
+
+/// @brief The main function.
+/// @param argc The number of arguments.
+/// @param argv The arguments.
+/// @return The exit status.
+int
+main(int argc, char *argv[])
+{
+    if (argc < 2) {
+        usage(EX_USAGE, argv[0]);
+    }
+    connect_db();
+    prepare();
+    long long total = execute(argv[1]);
+    printf("Total: %lld\n", total);
+    exit(EX_OK);
+}
