@@ -70,7 +70,6 @@ sql_error(
     vsql_warn(file, line, func, fmt, ap);
     verrx(exit_status, fmt, ap);
     va_end(ap);
-
 }
 
 /// @brief Connect to the database.
