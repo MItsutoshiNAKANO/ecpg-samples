@@ -3,6 +3,9 @@
 ##
 # @file
 # @brief Makefile.
+# @copyright
+#   (C) 2024 Mitsutoshi Nakano <ItSANgo@gmail.com>
+#   SPDX-License-Identifier: GPL-3.0-or-later
 
 TARGETS=prepared
 prepared_SRCS=prepared.pgc

@@ -1,6 +1,9 @@
 /**
  * @file
  * @brief The SQL commands for creating the tables.
+ * @copyright
+ *   (C) 2024 Mitsutoshi Nakano <ItSANgo@gmail.com>
+ *   SPDX-License-Identifier: GPL-3.0-or-later
  */
 
 CREATE TABLE months (

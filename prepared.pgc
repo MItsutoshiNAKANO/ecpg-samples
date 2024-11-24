@@ -1,5 +1,8 @@
 /// @file
 /// @brief The stored procedure samples.
+/// @copyright
+///   (C) 2024 Mitsutoshi Nakano <ItSANgo@gmail.com>
+///   SPDX-License-Identifier: GPL-3.0-or-later
 
 #include <err.h>
 #include <sysexits.h>
@@ -16,6 +19,8 @@
 /// @param func The function name.
 /// @param fmt The format string.
 /// @param ap The arguments.
+/// @see https://www.postgresql.org/docs/16/ecpg-errors.html#ECPG-SQLCA
+/// @see https://www.postgresql.org/docs/16/errcodes-appendix.html
 static void
 vsql_warn(
     const char *file, long line, const char *func, const char *fmt,
@@ -32,10 +37,13 @@ vsql_warn(
         sqlca.sqlerrd[0], sqlca.sqlerrd[1], sqlca.sqlerrd[2],
         sqlca.sqlerrd[3], sqlca.sqlerrd[4], sqlca.sqlerrd[5]);
     warnx("sqlwarn: %d %d %d %d %d %d %d %d",
-        sqlca.sqlwarn[0], sqlca.sqlwarn[1], sqlca.sqlwarn[2], sqlca.sqlwarn[3],
-        sqlca.sqlwarn[4], sqlca.sqlwarn[5], sqlca.sqlwarn[6], sqlca.sqlwarn[7]);
+        sqlca.sqlwarn[0], sqlca.sqlwarn[1], sqlca.sqlwarn[2],
+        sqlca.sqlwarn[3], sqlca.sqlwarn[4], sqlca.sqlwarn[5],
+        sqlca.sqlwarn[6], sqlca.sqlwarn[7]);
     warnx("sqlstate: %5s", sqlca.sqlstate);
     warnx("===============");
+    warnx("@see https://www.postgresql.org/docs/16/ecpg-errors.html#ECPG-SQLCA");
+    warnx("@see https://www.postgresql.org/docs/16/errcodes-appendix.html");
 }
 
 /// @brief Print the warning message.
@@ -100,7 +108,8 @@ prepare(void)
         snprintf(stmt, sizeof stmt, PREPARED_NAMES_FORMAT, i + 1);
         snprintf(
             query, sizeof query,
-            "SELECT value%d AS value FROM months WHERE month_label = ?", i + 1);
+            "SELECT value%d AS value FROM months WHERE month_label = ?",
+            i + 1);
         EXEC SQL PREPARE :stmt FROM :query;
     }
 }
