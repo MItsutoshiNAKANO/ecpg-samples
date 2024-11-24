@@ -130,7 +130,7 @@ execute(const char *month)
 
         snprintf(stmt, sizeof stmt, PREPARED_NAMES_FORMAT, i + 1);
         EXEC SQL EXECUTE :stmt INTO :val :val_ind USING :m;
-        if (val_ind < 0) {
+        if (val_ind) {
             continue;
         }
         total += val;
