@@ -151,7 +151,7 @@ usage(int exit_code, const char *program)
 
 /// @brief The main function.
 /// @param argc The number of arguments.
-/// @param argv The arguments.
+/// @param argv[1] The month.
 /// @return The exit status.
 int
 main(int argc, char *argv[])
