@@ -8,7 +8,7 @@
 #   SPDX-License-Identifier: GPL-3.0-or-later
 
 TARGETS=prepared
-prepared_SRCS=prepared.pgc
+prepared_SRCS=prepared.pgc sql_error.pgc
 prepared_CS=$(prepared_SRCS:.pgc=.c)
 prepared_OBJS=$(prepared_SRCS:.pgc=.o)
 ECPG=ecpg
@@ -24,7 +24,8 @@ gprof: $(TARGETS)
 gprof: CFLAGS+=-pg -g -O0
 prepared: $(prepared_OBJS)
 	$(CC) -o prepared $(prepared_OBJS) $(LIBS)
+$(prepared_OBJS): sql_error.h
+%.c: %.pgc
+	$(ECPG) -o $@ $<
 clean:
 	$(RM) $(TARGETS) $(prepared_OBJS) $(prepared_CS)
-%.c: %.pgc
-	$(ECPG) -o $@ $^
