@@ -7,6 +7,7 @@
 
 prepared
 prepared.c
+sql_error.c
 
 # @see https://raw.githubusercontent.com/github/gitignore/refs/heads/main/C.gitignore
 # Prerequisites
