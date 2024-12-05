@@ -9,11 +9,12 @@
 
 #include <stdarg.h>
 
-void vsql_warn(const char *file, long line, const char *func, const char *fmt,
-               va_list ap);
-void sql_warn(const char *file, long line, const char *func, const char *fmt,
-              ...);
-[[noreturn]] void sql_error(const char *file, long line, const char *func,
-                            int exit_status, const char *fmt, ...);
+void vsql_warn(
+    const char *file, long line, const char *func, const char *fmt, va_list ap);
+void
+sql_warn(const char *file, long line, const char *func, const char *fmt, ...);
+[[noreturn]] void sql_error(
+    const char *file, long line, const char *func, int exit_status,
+    const char *fmt, ...);
 
 #endif // End of ifndef SQL_ERROR_H

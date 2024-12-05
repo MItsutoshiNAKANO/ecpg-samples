@@ -4,10 +4,11 @@
 ///   (C) 2024 Mitsutoshi Nakano <ItSANgo@gmail.com>
 ///   SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "sql_error.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <sysexits.h>
+
+#include "sql_error.h"
 
 /// @brief The format of prepared statement names.
 #define PREPARED_NAMES_FORMAT "stmt%d"
@@ -16,88 +17,99 @@
 #define PREPARED_NAMES_SIZE 32
 
 /// @brief Connect to the database.
-static void connect_db(void) {
-  EXEC SQL WHENEVER SQLERROR CALL sql_error(__FILE__, __LINE__, __func__,
-                                            EX_IOERR, "connect error");
-  EXEC SQL WHENEVER SQLWARNING CALL sql_warn(__FILE__, __LINE__, __func__,
-                                             "connect warning");
-  EXEC SQL CONNECT TO "tcp:postgresql://127.0.0.1" USER "sample" USING "sample";
+static void
+connect_db(void)
+{
+    EXEC SQL WHENEVER SQLERROR CALL sql_error(
+        __FILE__, __LINE__, __func__, EX_IOERR, "connect error");
+    EXEC SQL WHENEVER SQLWARNING CALL sql_warn(
+        __FILE__, __LINE__, __func__, "connect warning");
+    EXEC SQL CONNECT TO "tcp:postgresql://127.0.0.1" USER "sample" USING
+                        "sample";
 }
 
 /// @brief Prepare the statements.
-static void prepare(void) {
-  EXEC SQL WHENEVER SQLERROR CALL sql_error(__FILE__, __LINE__, __func__,
-                                            EX_UNAVAILABLE, "prepare error");
-  EXEC SQL WHENEVER SQLWARNING CALL sql_warn(__FILE__, __LINE__, __func__,
-                                             "prepare warning");
-  for (int i = 0; i < 31; ++i) {
-    EXEC SQL BEGIN DECLARE SECTION;
-    char stmt[PREPARED_NAMES_SIZE];
-    char query[256];
-    EXEC SQL END DECLARE SECTION;
+static void
+prepare(void)
+{
+    EXEC SQL WHENEVER SQLERROR CALL sql_error(
+        __FILE__, __LINE__, __func__, EX_UNAVAILABLE, "prepare error");
+    EXEC SQL WHENEVER SQLWARNING CALL sql_warn(
+        __FILE__, __LINE__, __func__, "prepare warning");
+    for (int i = 0; i < 31; ++i) {
+        EXEC SQL BEGIN DECLARE SECTION;
+        char stmt[PREPARED_NAMES_SIZE];
+        char query[256];
+        EXEC SQL END DECLARE SECTION;
 
-    snprintf(stmt, sizeof stmt, PREPARED_NAMES_FORMAT, i + 1);
-    snprintf(query, sizeof query,
-             "SELECT value%d AS value FROM months WHERE month_label = ?",
-             i + 1);
-    // clang-format off
-    EXEC SQL PREPARE :stmt FROM :query;
-    // clang-format on
-  }
+        snprintf(stmt, sizeof stmt, PREPARED_NAMES_FORMAT, i + 1);
+        snprintf(
+            query, sizeof query,
+            "SELECT value%d AS value FROM months WHERE month_label = ?", i + 1);
+        // clang-format off
+        EXEC SQL PREPARE :stmt FROM :query;
+        // clang-format on
+    }
 }
 
 /// @brief Execute the statements.
 /// @param month The month.
 /// @return The total value.
-long long execute(const char *month) {
-  EXEC SQL WHENEVER SQLERROR CALL sql_error(__FILE__, __LINE__, __func__,
-                                            EX_UNAVAILABLE, "execute error");
-  EXEC SQL WHENEVER SQLWARNING CALL sql_warn(__FILE__, __LINE__, __func__,
-                                             "execute warning");
+long long
+execute(const char *month)
+{
+    EXEC SQL WHENEVER SQLERROR CALL sql_error(
+        __FILE__, __LINE__, __func__, EX_UNAVAILABLE, "execute error");
+    EXEC SQL WHENEVER SQLWARNING CALL sql_warn(
+        __FILE__, __LINE__, __func__, "execute warning");
 
-  EXEC SQL BEGIN DECLARE SECTION;
-  const char *m = month;
-  EXEC SQL END DECLARE SECTION;
-
-  long long total = 0;
-  for (int i = 0; i < 31; ++i) {
     EXEC SQL BEGIN DECLARE SECTION;
-    char stmt[PREPARED_NAMES_SIZE];
-    long long val;
-    int val_ind;
+    const char *m = month;
     EXEC SQL END DECLARE SECTION;
 
-    snprintf(stmt, sizeof stmt, PREPARED_NAMES_FORMAT, i + 1);
-    // clang-format off
-    EXEC SQL EXECUTE :stmt INTO :val :val_ind USING :m;
-    // clang-format on
-    if (val_ind) {
-      continue;
+    long long total = 0;
+    for (int i = 0; i < 31; ++i) {
+        EXEC SQL BEGIN DECLARE SECTION;
+        char stmt[PREPARED_NAMES_SIZE];
+        long long val;
+        int val_ind;
+        EXEC SQL END DECLARE SECTION;
+
+        snprintf(stmt, sizeof stmt, PREPARED_NAMES_FORMAT, i + 1);
+        // clang-format off
+        EXEC SQL EXECUTE :stmt INTO :val :val_ind USING :m;
+        // clang-format on
+        if (val_ind) {
+            continue;
+        }
+        total += val;
     }
-    total += val;
-  }
-  return total;
+    return total;
 }
 
 /// @brief Print the usage.
 /// @param exit_code The exit code.
 /// @param program The program name.
-[[noreturn]] static void usage(int exit_code, const char *program) {
-  fprintf(exit_code ? stderr : stdout, "Usage: %s YYYY-MM-01\n", program);
-  exit(exit_code);
+[[noreturn]] static void
+usage(int exit_code, const char *program)
+{
+    fprintf(exit_code ? stderr : stdout, "Usage: %s YYYY-MM-01\n", program);
+    exit(exit_code);
 }
 
 /// @brief The main function.
 /// @param argc The number of arguments.
 /// @param argv[1] The month.
 /// @return The exit status.
-int main(int argc, char *argv[]) {
-  if (argc < 2) {
-    usage(EX_USAGE, argv[0]);
-  }
-  connect_db();
-  prepare();
-  long long total = execute(argv[1]);
-  printf("Total: %lld\n", total);
-  exit(EX_OK);
+int
+main(int argc, char *argv[])
+{
+    if (argc < 2) {
+        usage(EX_USAGE, argv[0]);
+    }
+    connect_db();
+    prepare();
+    long long total = execute(argv[1]);
+    printf("Total: %lld\n", total);
+    exit(EX_OK);
 }
