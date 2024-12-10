@@ -4,11 +4,17 @@
 ///   (C) 2024 Mitsutoshi Nakano <ItSANgo@gmail.com>
 ///   SPDX-License-Identifier: GPL-3.0-or-later
 
+#include <err.h>
+#include <getopt.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sysexits.h>
 
+#include "debug.h"
+#include "error.h"
 #include "sql_error.h"
+
+#define VERSION "0.1.0"
 
 /// @brief The format of prepared statement names.
 #define PREPARED_NAMES_FORMAT "stmt%d"
@@ -16,16 +22,36 @@
 /// @brief The size of prepared statement names.
 #define PREPARED_NAMES_SIZE 32
 
+/// @brief The connection parameters.
+struct connection {
+    /// @brief The connection.
+    const char *connection;
+    /// @brief The user.
+    const char *user;
+    /// @brief The password.
+    const char *password;
+};
+
 /// @brief Connect to the database.
+/// @param connection The connection parameters.
 static void
-connect_db(void)
+connect_db(struct connection *connection)
 {
+    EXEC SQL BEGIN DECLARE SECTION;
+    const char *conn = connection->connection;
+    const char *user = connection->user;
+    const char *password = connection->password;
+    EXEC SQL END DECLARE SECTION;
+
     EXEC SQL WHENEVER SQLERROR CALL sql_error(
-        __FILE__, __LINE__, __func__, EX_IOERR, "connect error");
+        __FILE__, __LINE__, __func__, EX_IOERR, "connect error"
+    );
     EXEC SQL WHENEVER SQLWARNING CALL sql_warn(
-        __FILE__, __LINE__, __func__, "connect warning");
-    EXEC SQL CONNECT TO "tcp:postgresql://127.0.0.1" USER "sample" USING
-                        "sample";
+        __FILE__, __LINE__, __func__, "connect warning"
+    );
+    // clang-format off
+    EXEC SQL CONNECT TO :conn USER :user USING :password;
+    // clang-format on
 }
 
 /// @brief Prepare the statements.
@@ -33,9 +59,11 @@ static void
 prepare(void)
 {
     EXEC SQL WHENEVER SQLERROR CALL sql_error(
-        __FILE__, __LINE__, __func__, EX_UNAVAILABLE, "prepare error");
+        __FILE__, __LINE__, __func__, EX_UNAVAILABLE, "prepare error"
+    );
     EXEC SQL WHENEVER SQLWARNING CALL sql_warn(
-        __FILE__, __LINE__, __func__, "prepare warning");
+        __FILE__, __LINE__, __func__, "prepare warning"
+    );
     for (int i = 0; i < 31; ++i) {
         EXEC SQL BEGIN DECLARE SECTION;
         char stmt[PREPARED_NAMES_SIZE];
@@ -45,7 +73,9 @@ prepare(void)
         snprintf(stmt, sizeof stmt, PREPARED_NAMES_FORMAT, i + 1);
         snprintf(
             query, sizeof query,
-            "SELECT value%d AS value FROM months WHERE month_label = ?", i + 1);
+            "SELECT SUM(value%d) AS value FROM months WHERE month_label = ?",
+            i + 1
+        );
         // clang-format off
         EXEC SQL PREPARE :stmt FROM :query;
         // clang-format on
@@ -59,15 +89,18 @@ long long
 execute(const char *month)
 {
     EXEC SQL WHENEVER SQLERROR CALL sql_error(
-        __FILE__, __LINE__, __func__, EX_UNAVAILABLE, "execute error");
+        __FILE__, __LINE__, __func__, EX_UNAVAILABLE, "execute error %s", month
+    );
     EXEC SQL WHENEVER SQLWARNING CALL sql_warn(
-        __FILE__, __LINE__, __func__, "execute warning");
+        __FILE__, __LINE__, __func__, "execute warning %s", month
+    );
 
     EXEC SQL BEGIN DECLARE SECTION;
     const char *m = month;
     EXEC SQL END DECLARE SECTION;
 
     long long total = 0;
+    DEBUG_PRINTF(0x10000, "month: %s", m);
     for (int i = 0; i < 31; ++i) {
         EXEC SQL BEGIN DECLARE SECTION;
         char stmt[PREPARED_NAMES_SIZE];
@@ -79,6 +112,7 @@ execute(const char *month)
         // clang-format off
         EXEC SQL EXECUTE :stmt INTO :val :val_ind USING :m;
         // clang-format on
+        DEBUG_PRINTF(0x10000, "val: %lld, val_ind: %d", val, val_ind);
         if (val_ind) {
             continue;
         }
@@ -93,23 +127,82 @@ execute(const char *month)
 [[noreturn]] static void
 usage(int exit_code, const char *program)
 {
-    fprintf(exit_code ? stderr : stdout, "Usage: %s YYYY-MM-01\n", program);
+    fprintf(
+        exit_code ? stderr : stdout,
+        "Usage: %s [options] YYYY-MM-01\n"
+        "\tOptions:\n"
+        "\t\t[[-c|--connect] string] Connect to the database.\n"
+        "\t\t[[-u|--user] user] Connect as the user.\n"
+        "\t\t[[-p|--password] password] Connect with the password.\n"
+        "\t\t[[-v|--verbose] debug-level] Run with Debug Print.\n"
+        "\t\t[-h|--help] Print this help.\n"
+        "\t\t[-V|--version] Print the version.\n",
+        program
+    );
     exit(exit_code);
+}
+
+/// @brief Print the total.
+/// @param month The month.
+[[noreturn]] static void
+print_total(const char *month, struct connection *connection)
+{
+    connect_db(connection);
+    prepare();
+    long long total = execute(month);
+    printf("Total: %lld\n", total);
+    exit(EX_OK);
 }
 
 /// @brief The main function.
 /// @param argc The number of arguments.
 /// @param argv[1] The month.
 /// @return The exit status.
-int
+[[noreturn]] int
 main(int argc, char *argv[])
 {
-    if (argc < 2) {
+    static const struct option long_options[] = {
+        {"help", no_argument, 0, 'h'},
+        {"version", no_argument, 0, 'V'},
+        {"verbose", required_argument, 0, 'v'},
+        {"connect", required_argument, 0, 'c'},
+        {"user", required_argument, 0, 'u'},
+        {"password", required_argument, 0, 'p'},
+        {0, 0, 0, 0}
+    };
+    struct connection conn = {"tcp:postgresql://127.0.0.1", "sample", "sample"};
+    long long debug_level = 0;
+    char *endptr = NULL;
+    for (int c, option_index = -1;
+         (c = getopt_long(argc, argv, "v:c:u:p:hV", long_options, &option_index)
+         ) != -1;) {
+        switch (c) {
+        case 'h':
+            usage(EX_OK, argv[0]);
+        case 'V':
+            printf("%s\n", VERSION);
+            exit(EX_OK);
+        case 'c':
+            conn.connection = optarg;
+            break;
+        case 'u':
+            conn.user = optarg;
+            break;
+        case 'p':
+            conn.password = optarg;
+            break;
+        case 'v':
+            debug_level += strtoll(optarg, &endptr, 0);
+            break;
+        default:
+            warnx("Unknown option: %c", c);
+            usage(EX_USAGE, argv[0]);
+        }
+    }
+    set_debug_level(debug_level);
+    if (argc - optind < 1) {
+        warnx("Invalid number of arguments");
         usage(EX_USAGE, argv[0]);
     }
-    connect_db();
-    prepare();
-    long long total = execute(argv[1]);
-    printf("Total: %lld\n", total);
-    exit(EX_OK);
+    print_total(argv[optind], &conn);
 }

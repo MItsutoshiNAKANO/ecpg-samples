@@ -8,18 +8,20 @@
 #   SPDX-License-Identifier: GPL-3.0-or-later
 
 TARGETS=prepared
-prepared_SRCS=prepared.pgc sql_error.pgc
-prepared_HEADERS=sql_error.h
-prepared_CS=$(prepared_SRCS:.pgc=.c)
-prepared_OBJS=$(prepared_SRCS:.pgc=.o)
+prepared_ECPG_SRCS=prepared.pgc sql_error.pgc
+prepared_C_SRCS=debug.c error.c
+prepared_HEADERS=sql_error.h debug.h error.h
+prepared_OBJS=$(prepared_ECPG_SRCS:.pgc=.o) $(prepared_C_SRCS:.c=.o)
+prepared_CS=$(prepared_ECPG_SRCS:.pgc=.c)
+
 ECPG=ecpg
 CC=gcc-14
-CFLAGS=-Wall -Wextra -Werror -std=gnu23 -pedantic -I/usr/include/postgresql
+CFLAGS=-Wall -Wextra -Werror -std=gnu23 -Wpedantic -I/usr/include/postgresql
 LIBS=-lecpg -lpq
 FORMAT=clang-format -i
 
 .PHONY: all gprof format check clean
-.SUFFIXES: .o .c .pgc
+.SUFFIXES: .o .c .pgc .h
 
 all: $(TARGETS)
 gprof: $(TARGETS)
@@ -30,6 +32,7 @@ $(prepared_OBJS): $(prepared_HEADERS)
 %.c: %.pgc
 	$(ECPG) -o $@ $<
 format:
-	$(FORMAT) $(FORMAT_FLAGS) $(prepared_SRCS) $(prepared_HEADERS)
+	$(FORMAT) $(FORMAT_FLAGS) $(prepared_ECPG_SRCS) $(prepared_C_SRCS)\
+		$(prepared_HEADERS)
 clean:
 	$(RM) $(TARGETS) $(prepared_OBJS) $(prepared_CS)

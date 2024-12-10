@@ -9,7 +9,7 @@
 
 #include "sql_error.h"
 
-/// @brief Print the warning message.
+/// @brief Print PostgreSQL warning message.
 /// @param file The file name.
 /// @param line The line number.
 /// @param func The function name.
@@ -19,7 +19,8 @@
 /// @see https://www.postgresql.org/docs/16/errcodes-appendix.html
 void
 vsql_warn(
-    const char *file, long line, const char *func, const char *fmt, va_list ap)
+    const char *file, long line, const char *func, const char *fmt, va_list ap
+)
 {
     vwarnx(fmt, ap);
     warnx("in %s:%ld:%s()", file, line, func);
@@ -30,15 +31,17 @@ vsql_warn(
     warnx("sqlerrm.sqlerrmc: %s", sqlca.sqlerrm.sqlerrmc);
     warnx(
         "sqlerrd: %ld %ld %ld %ld %ld %ld", sqlca.sqlerrd[0], sqlca.sqlerrd[1],
-        sqlca.sqlerrd[2], sqlca.sqlerrd[3], sqlca.sqlerrd[4], sqlca.sqlerrd[5]);
+        sqlca.sqlerrd[2], sqlca.sqlerrd[3], sqlca.sqlerrd[4], sqlca.sqlerrd[5]
+    );
     warnx(
         "sqlwarn: %d %d %d %d %d %d %d %d", sqlca.sqlwarn[0], sqlca.sqlwarn[1],
         sqlca.sqlwarn[2], sqlca.sqlwarn[3], sqlca.sqlwarn[4], sqlca.sqlwarn[5],
-        sqlca.sqlwarn[6], sqlca.sqlwarn[7]);
+        sqlca.sqlwarn[6], sqlca.sqlwarn[7]
+    );
     warnx("sqlstate: %5s", sqlca.sqlstate);
     warnx("===============");
-    warnx(
-        "@see https://www.postgresql.org/docs/16/ecpg-errors.html#ECPG-SQLCA");
+    warnx("@see https://www.postgresql.org/docs/16/ecpg-errors.html#ECPG-SQLCA"
+    );
     warnx("@see https://www.postgresql.org/docs/16/errcodes-appendix.html");
 }
 
@@ -57,7 +60,24 @@ sql_warn(const char *file, long line, const char *func, const char *fmt, ...)
     va_end(ap);
 }
 
-/// @brief Print the error message and exit.
+/// @brief Print PostgreSQL error message and exit.
+/// @param file The file name.
+/// @param line The line number.
+/// @param func The function name.
+/// @param exit_status The exit status.
+/// @param fmt The format string.
+/// @param ap The arguments.
+[[noreturn]] void
+vsql_error(
+    const char *file, long line, const char *func, int exit_status,
+    const char *fmt, va_list ap
+)
+{
+    vsql_warn(file, line, func, fmt, ap);
+    verrx(exit_status, fmt, ap);
+}
+
+/// @brief Print PostgreSQL error message and exit.
 /// @param file The file name.
 /// @param line The line number.
 /// @param func The function name.
@@ -67,11 +87,11 @@ sql_warn(const char *file, long line, const char *func, const char *fmt, ...)
 [[noreturn]] void
 sql_error(
     const char *file, long line, const char *func, int exit_status,
-    const char *fmt, ...)
+    const char *fmt, ...
+)
 {
     va_list ap;
     va_start(ap, fmt);
-    vsql_warn(file, line, func, fmt, ap);
-    verrx(exit_status, fmt, ap);
+    vsql_error(file, line, func, exit_status, fmt, ap);
     va_end(ap);
 }

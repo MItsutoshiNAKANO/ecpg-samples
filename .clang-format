@@ -3,7 +3,7 @@
 BasedOnStyle:  LLVM
 # AccessModifierOffset: -2
 # AlignAfterOpenBracket: Align
-AlignAfterOpenBracket: AlwaysBreak
+AlignAfterOpenBracket: BlockIndent
 # AlignArrayOfStructures: None
 # AlignConsecutiveAssignments:
 #   Enabled:         false
@@ -39,6 +39,7 @@ AlignAfterOpenBracket: AlwaysBreak
 #   AcrossComments:  false
 #   AlignCaseColons: false
 # AlignEscapedNewlines: Right
+AlignEscapedNewlines: DontAlign
 # AlignOperands:   Align
 # AlignTrailingComments:
 #   Kind:            Always
@@ -52,12 +53,11 @@ AlignAfterOpenBracket: AlwaysBreak
 # AllowShortEnumsOnASingleLine: true
 # AllowShortFunctionsOnASingleLine: All
 # AllowShortIfStatementsOnASingleLine: Never
-AllowShortIfStatementsOnASingleLine: false
 # AllowShortLambdasOnASingleLine: All
 # AllowShortLoopsOnASingleLine: false
 # AlwaysBreakAfterDefinitionReturnType: None
 # AlwaysBreakAfterReturnType: None
-AlwaysBreakAfterReturnType: TopLevelDefinitions
+AlwaysBreakAfterReturnType: AllDefinitions
 # AlwaysBreakBeforeMultilineStrings: false
 # AlwaysBreakTemplateDeclarations: MultiLine
 # AttributeMacros:

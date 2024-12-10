@@ -7,7 +7,7 @@
  */
 
 CREATE TABLE months (
-    month_id SERIAL, month_label DATE NOT NULL,
+    month_id SERIAL, month_label DATE UNIQUE NOT NULL,
     value1 NUMERIC(19), value2 NUMERIC(19),
     value3 NUMERIC(19), value4 NUMERIC(19),
     value5 NUMERIC(19), value6 NUMERIC(19),

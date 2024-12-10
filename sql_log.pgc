@@ -1,0 +1,101 @@
+/// @file
+/// @brief Log functions for the PostgreSQL error messages.
+/// @copyright
+///   (C) 2024 Mitsutoshi Nakano <ItSANgo@gmail.com>
+///   SPDX-License-Identifier: GPL-3.0-or-later
+
+#include <stdarg.h>
+#include <syslog.h>
+
+#include "sql_error.h"
+#include "sql_log.h"
+
+/// @brief Log the PostgreSQL error message.
+/// @param priority The priority.
+/// @param file __FILE__.
+/// @param line __LINE__.
+/// @param func __func__.
+/// @param fmt The format string.
+/// @param ap The arguments.
+void
+vsql_log(
+    int priority, const char *file, long line, const char *func,
+    const char *fmt, va_list ap
+)
+{
+    vsyslog(priority, fmt, ap);
+    syslog(priority, "in %s:%ld:%s()", file, line, func);
+    syslog(priority, "==== sqlca ====");
+    syslog(priority, "sqlcode: %ld", sqlca.sqlcode);
+    syslog(priority, "sqlerrm.sqlerrml: %d", sqlca.sqlerrm.sqlerrml);
+    syslog(priority, "sqlerrm.sqlerrmc: %s", sqlca.sqlerrm.sqlerrmc);
+    syslog(
+        priority, "sqlerrd: %ld %ld %ld %ld %ld %ld", sqlca.sqlerrd[0],
+        sqlca.sqlerrd[1], sqlca.sqlerrd[2], sqlca.sqlerrd[3], sqlca.sqlerrd[4],
+        sqlca.sqlerrd[5]
+    );
+    syslog(
+        priority, "sqlwarn: %d %d %d %d %d %d %d %d", sqlca.sqlwarn[0],
+        sqlca.sqlwarn[1], sqlca.sqlwarn[2], sqlca.sqlwarn[3], sqlca.sqlwarn[4],
+        sqlca.sqlwarn[5], sqlca.sqlwarn[6], sqlca.sqlwarn[7]
+    );
+    syslog(priority, "sqlstate: %5s", sqlca.sqlstate);
+    syslog(priority, "===============");
+    syslog(
+        priority,
+        "@see https://www.postgresql.org/docs/16/ecpg-errors.html#ECPG-SQLCA"
+    );
+    syslog(
+        priority,
+        "@see https://www.postgresql.org/docs/16/errcodes-appendix.html"
+    );
+}
+
+/// @brief Log the error message.
+/// @param priority The priority.
+/// @param file __FILE__.
+/// @param line __LINE__.
+/// @param func __func__.
+/// @param fmt The format string.
+/// @param ... The arguments.
+void
+sql_log(
+    int priority, const char *file, long line, const char *func,
+    const char *fmt, ...
+)
+{
+    va_list ap;
+    va_start(ap, fmt);
+    vsql_log(priority, file, line, func, fmt, ap);
+    va_end(ap);
+}
+
+/// @brief Log the PostgreSQL error message and exit.
+/// @param priority The priority.
+/// @param file __FILE__.
+/// @param line __LINE__.
+/// @param func __func__.
+/// @param exit_status The exit status.
+/// @param fmt The format string.
+/// @param ap The arguments.
+[[noreturn]] void
+vsql_log_exit(
+    int priority, const char *file, long line, const char *func,
+    int exit_status, const char *fmt, va_list ap
+)
+{
+    vsql_log(priority, file, line, func, fmt, ap);
+    vsql_error(file, line, func, exit_status, fmt, ap);
+}
+
+[[noreturn]] void
+sql_log_exit(
+    int priority, const char *file, long line, const char *func,
+    int exit_status, const char *fmt, ...
+)
+{
+    va_list ap;
+    va_start(ap, fmt);
+    vsql_log_exit(priority, file, line, func, exit_status, fmt, ap);
+    va_end(ap);
+}
