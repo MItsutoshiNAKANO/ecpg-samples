@@ -11,7 +11,7 @@
 static long long base_debug_level = 0;
 
 /// @brief Set the base debug level.
-/// @param level
+/// @param level The debug level.
 void
 set_debug_level(long long level)
 {
