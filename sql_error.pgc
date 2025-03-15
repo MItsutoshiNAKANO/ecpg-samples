@@ -1,7 +1,7 @@
 /// @file
 /// @brief ECPG error handling samples.
 /// @copyright
-///   (C) 2024 Mitsutoshi Nakano <ItSANgo@gmail.com>
+///   (C) 2025 Mitsutoshi Nakano <ItSANgo@gmail.com>
 ///   SPDX-License-Identifier: GPL-3.0-or-later
 
 #include <err.h>
@@ -23,26 +23,17 @@ vsql_warn(
 )
 {
     vwarnx(fmt, ap);
-    warnx("in %s:%ld:%s()", file, line, func);
-
-    warnx("==== sqlca ====");
-    warnx("sqlcode: %ld", sqlca.sqlcode);
-    warnx("sqlerrm.sqlerrml: %d", sqlca.sqlerrm.sqlerrml);
-    warnx("sqlerrm.sqlerrmc: %s", sqlca.sqlerrm.sqlerrmc);
+    warnx("sqlerrm: %s", sqlca.sqlerrm.sqlerrmc);
     warnx(
-        "sqlerrd: %ld %ld %ld %ld %ld %ld", sqlca.sqlerrd[0], sqlca.sqlerrd[1],
-        sqlca.sqlerrd[2], sqlca.sqlerrd[3], sqlca.sqlerrd[4], sqlca.sqlerrd[5]
+        "code=%ld:state=%5s:errml=%d:"
+        "sqlerrd: %ld %ld %ld %ld %ld %ld, sqlwarn: %d %d %d %d %d %d %d %d",
+        sqlca.sqlcode, sqlca.sqlstate, sqlca.sqlerrm.sqlerrml, sqlca.sqlerrd[0],
+        sqlca.sqlerrd[1], sqlca.sqlerrd[2], sqlca.sqlerrd[3], sqlca.sqlerrd[4],
+        sqlca.sqlerrd[5], sqlca.sqlwarn[0], sqlca.sqlwarn[1], sqlca.sqlwarn[2],
+        sqlca.sqlwarn[3], sqlca.sqlwarn[4], sqlca.sqlwarn[5], sqlca.sqlwarn[6],
+        sqlca.sqlwarn[7]
     );
-    warnx(
-        "sqlwarn: %d %d %d %d %d %d %d %d", sqlca.sqlwarn[0], sqlca.sqlwarn[1],
-        sqlca.sqlwarn[2], sqlca.sqlwarn[3], sqlca.sqlwarn[4], sqlca.sqlwarn[5],
-        sqlca.sqlwarn[6], sqlca.sqlwarn[7]
-    );
-    warnx("sqlstate: %5s", sqlca.sqlstate);
-    warnx("===============");
-    warnx("@see https://www.postgresql.org/docs/16/ecpg-errors.html#ECPG-SQLCA"
-    );
-    warnx("@see https://www.postgresql.org/docs/16/errcodes-appendix.html");
+    warnx("  at %s:%ld:%s()", file, line, func);
 }
 
 /// @brief Print the warning message.
