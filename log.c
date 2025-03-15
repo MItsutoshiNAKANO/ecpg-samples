@@ -22,8 +22,8 @@ vmy_log(
     const char *fmt, va_list ap
 )
 {
-    syslog(priority, "%s:%ld:%s()", file, line, func);
     vsyslog(priority, fmt, ap);
+    syslog(priority, "  at %s:%ld:%s()", file, line, func);
 }
 
 /// @brief
