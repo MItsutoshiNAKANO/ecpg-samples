@@ -4,10 +4,17 @@
 # @file
 # @brief Makefile.
 # @copyright
-#   (C) 2024 Mitsutoshi Nakano <ItSANgo@gmail.com>
+#   (C) 2025 Mitsutoshi Nakano <ItSANgo@gmail.com>
 #   SPDX-License-Identifier: GPL-3.0-or-later
 
-TARGETS=prepared
+TARGETS=loop_prepare prepared
+
+loop_prepare_ECPG_SRCS=loop_prepare.pgc sql_error.pgc
+loop_prepare_C_SRCS=error.c
+loop_prepare_HEADERS=sql_error.h error.h
+loop_prepare_OBJS=$(loop_prepare_ECPG_SRCS:.pgc=.o) $(loop_prepare_C_SRCS:.c=.o)
+loop_prepare_CS=$(loop_prepare_ECPG_SRCS:.pgc=.c)
+
 prepared_ECPG_SRCS=prepared.pgc sql_error.pgc
 prepared_C_SRCS=debug.c error.c
 prepared_HEADERS=sql_error.h debug.h error.h
@@ -26,13 +33,19 @@ FORMAT=clang-format -i
 all: $(TARGETS)
 gprof: $(TARGETS)
 gprof: CFLAGS+=-pg -g -O0
+loop_prepare: $(loop_prepare_OBJS)
+	$(CC) -o loop_prepare $(loop_prepare_OBJS) $(LIBS)
 prepared: $(prepared_OBJS)
 	$(CC) -o prepared $(prepared_OBJS) $(LIBS)
+$(loop_prepare_OBJS): $(loop_prepare_HEADERS)
 $(prepared_OBJS): $(prepared_HEADERS)
+loop_prepare.c: loop_prepare.pgc
+sql_error.c: sql_error.pgc
 %.c: %.pgc
 	$(ECPG) -o $@ $<
 format:
-	$(FORMAT) $(FORMAT_FLAGS) $(prepared_ECPG_SRCS) $(prepared_C_SRCS)\
-		$(prepared_HEADERS)
+	$(FORMAT) $(FORMAT_FLAGS) $(loop_prepare_ECPG_SRCS) $(prepared_ECPG_SRCS)\
+		$(prepared_C_SRCS) $(prepared_HEADERS)
 clean:
-	$(RM) $(TARGETS) $(prepared_OBJS) $(prepared_CS)
+	$(RM) $(TARGETS) $(loop_prepare_OBJS) $(loop_prepare_CS)\
+		$(prepared_OBJS) $(prepared_CS)

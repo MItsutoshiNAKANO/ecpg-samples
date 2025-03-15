@@ -1,0 +1,187 @@
+/// @file
+/// @brief The stored procedure samples.
+/// @copyright
+///   (C) 2025 Mitsutoshi Nakano <ItSANgo@gmail.com>
+///   SPDX-License-Identifier: GPL-3.0-or-later
+
+#include <err.h>
+#include <getopt.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sysexits.h>
+
+#include "error.h"
+#include "sql_error.h"
+
+#define VERSION "0.1.0"
+
+/// @brief The connection parameters.
+struct connection {
+    /// @brief The connection.
+    const char *connection;
+    /// @brief The user.
+    const char *user;
+    /// @brief The password.
+    const char *password;
+};
+
+/// @brief Connect to the database.
+/// @param connection The connection parameters.
+static void
+connect_db(struct connection *connection)
+{
+    EXEC SQL BEGIN DECLARE SECTION;
+    const char *conn = connection->connection;
+    const char *user = connection->user;
+    const char *password = connection->password;
+    EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL WHENEVER SQLERROR CALL sql_error(
+        __FILE__, __LINE__, __func__, EX_IOERR, "connect error"
+    );
+    EXEC SQL WHENEVER SQLWARNING CALL sql_warn(
+        __FILE__, __LINE__, __func__, "connect warning"
+    );
+
+    // clang-format off
+    EXEC SQL CONNECT TO :conn USER :user USING :password;
+    // clang-format on
+
+    EXEC SQL WHENEVER SQLERROR CONTINUE;
+    EXEC SQL WHENEVER SQLWARNING CONTINUE;
+}
+
+static long
+create_temporary(void)
+{
+    EXEC SQL CREATE TEMPORARY TABLE IF NOT EXISTS temporary(dummy INTEGER);
+    SQL_WARN("Create Temporary Table");
+    return sqlca.sqlcode;
+}
+
+/// @brief Query the database.
+/// @return The status.
+static long
+query(void)
+{
+    EXEC SQL DECLARE statement_name STATEMENT;
+    SQL_WARN("Declare Statement");
+    EXEC SQL DECLARE cursor_name CURSOR FOR statement_name;
+    SQL_WARN("Declare Cursor");
+    EXEC SQL PREPARE statement_name FROM "SELECT month_id FROM months;";
+    SQL_WARN("Prepare");
+    EXEC SQL OPEN cursor_name;
+    SQL_WARN("Open Cursor");
+    if (memcmp(sqlca.sqlstate, "00", 2) && memcmp(sqlca.sqlstate, "01", 2)) {
+        long result = sqlca.sqlcode;
+        EXEC SQL CLOSE cursor_name;
+        SQL_WARN("Close Cursor");
+        return result;
+    }
+    for (;;) {
+        EXEC SQL BEGIN DECLARE SECTION;
+        long long month_id;
+        EXEC SQL END DECLARE SECTION;
+
+        // clang-format off
+        EXEC SQL FETCH cursor_name INTO :month_id;
+        // clang-format on
+        SQL_WARN("Fetch");
+        if (memcmp(sqlca.sqlstate, "00", 2) &&
+            memcmp(sqlca.sqlstate, "01", 2)) {
+            long result = sqlca.sqlcode;
+            EXEC SQL CLOSE cursor_name;
+            SQL_WARN("Close Cursor");
+            return result;
+        }
+        printf("month_id: %lld\n", month_id);
+    }
+}
+
+/// @brief Print the usage.
+/// @param exit_code The exit code.
+/// @param program The program name.
+[[noreturn]] static void
+usage(int exit_code, const char *program)
+{
+    fprintf(
+        exit_code ? stderr : stdout,
+        "Usage: %s [options]\n"
+        "\tOptions:\n"
+        "\t\t[[-c|--connect] string] Connect to the database.\n"
+        "\t\t[[-u|--user] user] Connect as the user.\n"
+        "\t\t[[-p|--password] password] Connect with the password.\n"
+        "\t\t[[-r|--repeat] number] Repeat Number\n"
+        "\t\t[-h|--help] Print this help.\n"
+        "\t\t[-V|--version] Print the version.\n",
+        program
+    );
+    exit(exit_code);
+}
+
+/// @brief Repeat queries.
+/// @param n Repeat n times.
+/// @param connection The connection parameters.
+[[noreturn]] static void
+body(long long n, struct connection *connection)
+{
+    connect_db(connection);
+    for (long long i = 0; i < n; i++) {
+        create_temporary();
+        query();
+    }
+    exit(EX_OK);
+}
+
+/// @brief The main function.
+/// @param argc The number of arguments.
+/// @param argv The arguments.
+/// @return The exit status.
+[[noreturn]] int
+main(int argc, char *argv[])
+{
+    static const struct option long_options[] = {
+        {"help", no_argument, 0, 'h'},
+        {"version", no_argument, 0, 'V'},
+        {"connect", required_argument, 0, 'c'},
+        {"user", required_argument, 0, 'u'},
+        {"password", required_argument, 0, 'p'},
+        {"repeat", required_argument, 0, 'r'},
+        {0, 0, 0, 0}
+    };
+    struct connection conn = {"tcp:postgresql://127.0.0.1", "sample", "sample"};
+    long long repeat_number = 2;
+    char *endptr = NULL;
+    for (int c, option_index = -1;
+         (c = getopt_long(argc, argv, "r:c:u:p:hV", long_options, &option_index)
+         ) != -1;) {
+        switch (c) {
+        case 'h':
+            usage(EX_OK, argv[0]);
+        case 'V':
+            printf("%s\n", VERSION);
+            exit(EX_OK);
+        case 'c':
+            conn.connection = optarg;
+            break;
+        case 'u':
+            conn.user = optarg;
+            break;
+        case 'p':
+            conn.password = optarg;
+            break;
+        case 'r':
+            repeat_number = strtoll(optarg, &endptr, 0);
+            break;
+        default:
+            warnx("Unknown option: %c", c);
+            usage(EX_USAGE, argv[0]);
+        }
+    }
+    if (argc - optind < 0) {
+        warnx("Invalid number of arguments");
+        usage(EX_USAGE, argv[0]);
+    }
+    body(repeat_number, &conn);
+}
