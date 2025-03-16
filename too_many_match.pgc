@@ -1,0 +1,179 @@
+/// @file
+/// @brief Reproduce the too many matches error.
+/// @copyright
+///   2025 Mitsutoshi Nakano
+///   SPDX-License-Identifier: AGPL-3.0
+/// @author Mitsutoshi Nakano <ItSANgo@gmail.com>
+/// @version 0.1.0
+/// @date 2025-03-15
+
+#include <err.h>
+#include <getopt.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <sysexits.h>
+
+#include "error.h"
+#include "sql_error.h"
+
+#define VERSION "0.1.0"
+#define BUFFER_SIZE 1024
+
+/// @brief The connection parameters.
+struct connection {
+    /// @brief The connection.
+    const char *connection;
+    /// @brief The user.
+    const char *user;
+    /// @brief The password.
+    const char *password;
+};
+
+/// @brief Connect to the database.
+/// @param connection The connection parameters.
+static void
+connect_db(struct connection *connection)
+{
+    EXEC SQL BEGIN DECLARE SECTION;
+    const char *conn = connection->connection;
+    const char *user = connection->user;
+    const char *password = connection->password;
+    EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL WHENEVER SQLERROR GOTO error;
+    EXEC SQL WHENEVER SQLWARNING CALL sql_warn(
+        __FILE__, __LINE__, __func__, "connect warning"
+    );
+
+    // clang-format off
+    EXEC SQL CONNECT TO :conn USER :user USING :password;
+    // clang-format on
+
+    EXEC SQL WHENEVER SQLERROR CONTINUE;
+    EXEC SQL WHENEVER SQLWARNING CONTINUE;
+    return;
+error:
+    SQL_ERROR(EX_IOERR, "connect error");
+}
+
+/// @brief Query the database.
+/// @param query_string The query string.
+static void
+query(const char *query_string)
+{
+    EXEC SQL BEGIN DECLARE SECTION;
+    const char *q = query_string;
+    char result1[BUFFER_SIZE] = {0};
+    char result2[BUFFER_SIZE] = {0};
+    int result_ind1 = 0;
+    int result_ind2 = 0;
+    EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL WHENEVER SQLERROR GOTO error;
+    EXEC SQL WHENEVER SQLWARNING CALL sql_warn(
+        __FILE__, __LINE__, __func__, "warning"
+    );
+
+    EXEC SQL DECLARE statement_name STATEMENT;
+
+    warnx("%s", q);
+
+    // clang-format off
+    EXEC SQL PREPARE statement_name FROM :q;
+    EXEC SQL EXECUTE statement_name INTO
+    :result1 :result_ind1, :result2 :result_ind2;
+    // clang-format on
+
+    printf("%s, %s\n", result1, result2);
+
+    EXEC SQL WHENEVER SQLERROR CONTINUE;
+    EXEC SQL WHENEVER SQLWARNING CONTINUE;
+    return;
+error:
+    SQL_ERROR(EX_UNAVAILABLE, "query error");
+}
+
+/// @brief Print the usage.
+/// @param exit_code The exit code.
+/// @param program The program name.
+[[noreturn]] static void
+usage(int exit_code, const char *program)
+{
+    fprintf(
+        exit_code ? stderr : stdout,
+        "Usage: %s [options] 'query'\n"
+        "  Options:\n"
+        "    [[-q|--query] string] The query string.\n"
+        "    [[-c|--connect] string] Connect to the database.\n"
+        "    [[-u|--user] user] Connect as the user.\n"
+        "    [[-p|--password] password] Connect with the password.\n"
+        "    [-h|--help] Print this help.\n"
+        "    [-V|--version] Print the version.\n",
+        program
+    );
+    exit(exit_code);
+}
+
+/// @brief Repeat queries.
+/// @param connection The connection parameters.
+/// @param query_string The query string.
+[[noreturn]] static void
+body(struct connection *connection, const char *query_string)
+{
+    connect_db(connection);
+    query(query_string);
+    EXEC SQL DISCONNECT;
+    exit(EX_OK);
+}
+
+/// @brief The main function.
+/// @param argc The number of arguments.
+/// @param argv The arguments.
+/// @return The exit status.
+[[noreturn]] int
+main(int argc, char *argv[])
+{
+    static const struct option long_options[] = {
+        {"help", no_argument, 0, 'h'},
+        {"version", no_argument, 0, 'V'},
+        {"connect", required_argument, 0, 'c'},
+        {"user", required_argument, 0, 'u'},
+        {"password", required_argument, 0, 'p'},
+        {"query", required_argument, 0, 'q'},
+        {0, 0, 0, 0}
+    };
+    struct connection conn = {"tcp:postgresql://127.0.0.1", "sample", "sample"};
+    const char *query_string =
+        "SELECT user_name, real_name FROM users WHERE addr = 'Address 2'";
+    for (int c, option_index = -1;
+         (c = getopt_long(argc, argv, "c:u:p:q:hV", long_options, &option_index)
+         ) != -1;) {
+        switch (c) {
+        case 'h':
+            usage(EX_OK, argv[0]);
+        case 'V':
+            printf("%s\n", VERSION);
+            exit(EX_OK);
+        case 'c':
+            conn.connection = optarg;
+            break;
+        case 'u':
+            conn.user = optarg;
+            break;
+        case 'p':
+            conn.password = optarg;
+            break;
+        case 'q':
+            query_string = optarg;
+            break;
+        default:
+            warnx("unknown option: %c", c);
+            usage(EX_USAGE, argv[0]);
+        }
+    }
+    if (argc - optind < 0) {
+        warnx("invalid number of arguments");
+        usage(EX_USAGE, argv[0]);
+    }
+    body(&conn, query_string);
+}
