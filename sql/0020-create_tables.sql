@@ -6,6 +6,7 @@
  *   SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+DROP TABLE months;
 CREATE TABLE months (
     month_id SERIAL, month_label DATE UNIQUE NOT NULL,
     value1 NUMERIC(19), value2 NUMERIC(19),
@@ -27,4 +28,13 @@ CREATE TABLE months (
     create_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     update_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (month_id)
+);
+
+DROP TABLE users;
+CREATE TABLE users (
+    user_id SERIAL, user_name VARCHAR(255) UNIQUE NOT NULL,
+    real_name VARCHAR(255), addr VARCHAR(255),
+    create_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_id)
 );
