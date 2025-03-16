@@ -30,3 +30,18 @@ INSERT INTO months (
     121, 122, 123, 124, 125,
     126, 127, 128, 129, 130, 131
 );
+
+DELETE FROM users;
+INSERT INTO users (
+    user_name, real_name, addr
+) VALUES (
+    'user1', 'User 1', 'Address 1'
+), (
+    'user2', 'User 2', NULL
+), (
+    'user3', NULL, NULL
+), (
+    'user4', 'user4', 'Address 2'
+), (
+    'user5', 'User 5', 'Address 2'
+);
