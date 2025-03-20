@@ -20,7 +20,7 @@
 /// @brief Failed and exit.
 /// @param exit_status The exit status.
 #define ERR(exit_status, ...) \
-    my_err(__FILE__, __LINE__, __func__, errno, exit_status, __VA_ARGS__)
+    my_err(__FILE__, __LINE__, __func__, exit_status, __VA_ARGS__)
 
 /// @brief Failed and exit.
 /// @param exit_status The exit status.
